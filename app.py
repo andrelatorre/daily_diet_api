@@ -3,6 +3,7 @@ from models.user import User
 from models.dieta import Dieta
 from database import db
 from flask_login import LoginManager, login_user, current_user, logout_user, login_required
+from sqlalchemy.orm import joinedload
 import bcrypt
 
 app = Flask(__name__)
@@ -107,8 +108,13 @@ def delete_user(id_user):
 
 #ROTAS DA DIETA
 @app.route('/dieta', methods=["POST"])
+#@login_required
 def create():
     data = request.json
+
+   # if id_user != current_user.id and current_user.role == 'user':
+   #     return jsonify({"message": "Operação não permitida"}), 403
+
     nome = data.get("nome")
     descricao = data.get("descricao")
     data_hora = data.get("data_hora")
@@ -122,5 +128,67 @@ def create():
 
     return jsonify({"message": "Dados inválidos"}), 400
 
+@app.route('/dieta/<int:id_dieta>', methods=["PUT"])
+#@login_required
+def update_dieta(id_dieta):    
+    data = request.json
+    dieta = Dieta.query.get(id_dieta)
+
+   # if id_user != current_user.id and current_user.role == 'user':
+    #    return jsonify({"message": "Operação não permitida"}), 403
+
+    if id_dieta and (data.get("nome") or data.get("descricao") or data.get("data_hora") or data.get("dieta")):
+        dieta.nome = data.get("nome")
+        dieta.descricao = data.get("descricao")
+        dieta.data_hora = data.get("data_hora")
+        dieta.dieta = data.get("dieta")
+        db.session.commit()
+        return jsonify({"message": f"Dieta {id_dieta} atualizado com sucesso!"}), 200
+    
+    return jsonify({"message": "Usuário não encontrado"}), 404
+
+@app.route('/dieta/<int:id_dieta>', methods=["DELETE"])
+#@login_required
+def delete_dieta(id_dieta):    
+    dieta = Dieta.query.get(id_dieta)
+    #if current_user.role != 'admin':
+    #    return jsonify({"message": "Operação não permitida"}), 403
+    #if id_user == current_user.id:
+    #    return jsonify({"message": "Operação não permitida"}), 403
+    
+    if id_dieta:
+        db.session.delete(dieta)
+        db.session.commit()
+        return jsonify({"message": f"Dieta {id_dieta} deletado com sucesso!"}), 200
+    
+    return jsonify({"message": "Usuário não encontrado"}), 404
+
+@app.route('/dieta/<int:id_dieta>', methods=["GET"])
+#@login_required
+def read_dieta(id_dieta):
+    dieta = Dieta.query.get(id_dieta)
+    if dieta:
+        return {
+                "nome": dieta.nome, 
+                "descricao": dieta.descricao,
+                "data_hora": dieta.data_hora,
+                "dieta": dieta.dieta
+                }
+    
+    return jsonify({"message": "Dieta não encontrada"}), 404
+
+@app.route('/usuarios-com-dieta/<int:id_dieta>', methods=['GET'])
+def get_usuario_dieta(id_dieta):
+    user = User.query.filter_by(cd_dieta=id_dieta).all() 
+    if user:
+        user_list = [u.to_dict() for u in user]
+        output = {
+                    "Usuários": user_list,
+                    "total_usuarios": len(user_list)
+                }
+        return jsonify(output)
+    
+    return jsonify({"message": "Nenhum usuário encontrado"}), 404
+    
 if __name__ == '__main__':
     app.run(debug=True)
